@@ -1,7 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from src.langchain.pipeline import initiate_chat_bot
+from langchain_core.prompts import ChatPromptTemplate
+import os
 
 app = FastAPI(title="Foursquare AI Bot API", description="API for querying POI data using DuckDB and LangChain.")
+BOT = initiate_chat_bot()
 
 @app.get("/")
 def read_root():
@@ -12,7 +17,17 @@ def read_root():
 def health_check():
     return JSONResponse(content={"status": "ok"})
 
-# You can add more endpoints here for your bot logic
+class QueryRequest(BaseModel):
+    question: str
+
+@app.post("/ask")
+def ask_question(request: QueryRequest):
+    result = BOT.process_question(request.question)
+    return {
+        "query": result["state"].query,
+        "result": result["state"].result,
+        "answer": result["state"].answer
+    }
 
 if __name__ == "__main__":
     import uvicorn
