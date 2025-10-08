@@ -16,7 +16,7 @@ def get_duckdb_connection(database: str) -> duckdb.DuckDBPyConnection:
 def create_places_with_categories_view_and_export(
     s3_places_path: str,
     s3_categories_path: str,
-    output_path: str = 'data\output.geoparquet',
+    output_path: str = r'data\output.geoparquet',
     db_path: str = ':memory:'
 ):
     """
@@ -59,5 +59,5 @@ if __name__ == "__main__":
     create_places_with_categories_view_and_export(
         s3_places_path=s3_places_path,
         s3_categories_path=s3_categories_path,
-        output_path='data/output.geoparquet'
+        output_path=r'data/output.geoparquet'
     )

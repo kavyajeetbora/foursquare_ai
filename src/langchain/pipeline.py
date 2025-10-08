@@ -50,9 +50,6 @@ def initiate_chat_bot():
     user_prompt = "Question: {input}"
     query_prompt_template = ChatPromptTemplate.from_messages([("system", SYSTEM_MESSAGE), ("user", user_prompt)])
 
-
-
-
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
     fsq_chat_bot = FourSquareChatBot(
@@ -73,6 +70,7 @@ if __name__ == "__main__":
     # query = "List down some coffee shops in Jodhpur?"
 
     question = "List petrol pumps in Chennai."
+    fsq_chat_bot = initiate_chat_bot()
     state = fsq_chat_bot.process_question(question=question)['state']
     print("Generated Query:\n", state.query)
     print("Query Result:\n", state.result)
