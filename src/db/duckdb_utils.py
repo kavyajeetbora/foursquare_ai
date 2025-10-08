@@ -34,44 +34,18 @@ def create_places_with_categories_view_and_export(
 
         # Create the view
         con.execute(f"""
-        CREATE OR REPLACE VIEW places_with_categories AS
-        WITH places AS (
-            SELECT
-                DISTINCT UNNEST(P.fsq_category_ids) as fsq_category_id,
-                name,
-                postcode,
-                address,
-                region,
-                ST_Point(longitude, latitude) AS geom
-            FROM read_parquet('{s3_places_path}') AS P
-            WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND country='IN'
-        ),
-        places_with_categories AS (
-            SELECT
-                P.name AS name,
-                C.level1_category_name AS category_level_1,
-                C.level2_category_name AS category_level_2,
-                postcode,
-                address,
-                region,
-                P.geom
-            FROM places AS P
-            JOIN read_parquet('{s3_categories_path}') AS C
-            ON P.fsq_category_id = C.category_id
-        )
-        SELECT
-            name,
-            category_level_1,
-            category_level_2,
-            address,
-            region,
-            postcode,
-            geom
-        FROM places_with_categories;
+            COPY (
+                SELECT
+                    name,
+                    UNNEST(fsq_category_labels) as category,
+                    address,
+                    region,
+                    postcode,
+                    geom
+                FROM read_parquet('{s3_places_path}')  WHERE country = 'IN'      
+            ) TO '{output_path}' WITH (FORMAT PARQUET, CODEC ZSTD);
         """)
 
-        # Export the view to GeoParquet
-        con.execute(f"COPY (SELECT * FROM places_with_categories) TO '{output_path}' WITH (FORMAT PARQUET, CODEC ZSTD);")
     finally:
         con.close()
 
