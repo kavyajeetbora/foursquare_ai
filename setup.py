@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import shutil
+import argparse
 
 VENV_DIR = "venv"
 REQUIREMENTS_FILE = "requirements.txt"
@@ -30,7 +31,6 @@ def clear_venv():
 
 
 def main():
-    import argparse
     parser = argparse.ArgumentParser(description="Setup or clear Python venv.")
     parser.add_argument("action", choices=["setup", "clear"], help="Action to perform: setup or clear the venv.")
     args = parser.parse_args()

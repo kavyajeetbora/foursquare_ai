@@ -64,6 +64,7 @@ coverage.xml
 
 # Logs
 *.log
+logs
 
 # Local data
 *.sqlite3

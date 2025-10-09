@@ -151,11 +151,14 @@ def load_vector_db(path, collection_name="poi_category_embeddings"):
 
 if __name__ == "__main__":
 
-    s3_places_path = 's3://fsq-os-places-us-east-1/release/dt=2025-09-09/places/parquet/places-*.zstd.parquet'
-    s3_categories_path = 's3://fsq-os-places-us-east-1/release/dt=2025-09-09/categories/parquet/categories.zstd.parquet'
+    # s3_places_path = 's3://fsq-os-places-us-east-1/release/dt=2025-09-09/places/parquet/places-*.zstd.parquet'
+    # s3_categories_path = 's3://fsq-os-places-us-east-1/release/dt=2025-09-09/categories/parquet/categories.zstd.parquet'
 
-    create_places_with_categories_view_and_export(
-        s3_places_path=s3_places_path,
-        s3_categories_path=s3_categories_path,
-        output_path=r'data/output.geoparquet'
-    )
+    # create_places_with_categories_view_and_export(
+    #     s3_places_path=s3_places_path,
+    #     s3_categories_path=s3_categories_path,
+    #     output_path=r'data/output.geoparquet'
+    # )
+
+    vector_db_path = r"data\vector_db"
+    create_category_list(vector_db_dir=vector_db_path)
