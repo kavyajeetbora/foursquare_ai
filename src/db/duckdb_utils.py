@@ -8,7 +8,7 @@ from langchain_chroma import Chroma
 import os
 from glob import glob
 import shutil
-import logging
+from src.utils.logger import logging
 import randomname
 
 def get_duckdb_connection(database: str) -> duckdb.DuckDBPyConnection:
