@@ -10,6 +10,7 @@ from glob import glob
 import shutil
 from src.utils.logger import logging
 import randomname
+from time import time
 
 def get_duckdb_connection(database: str) -> duckdb.DuckDBPyConnection:
     """Create and configure a DuckDB connection."""
@@ -57,13 +58,13 @@ def create_places_with_categories_view_and_export(
     finally:
         con.close()
 
-def create_category_list(vector_db_dir: str):
+def create_vector_db_for_categories(vector_db_dir: str, model_name: str):
     """
     Creates a distinct list of categories from the places parquet files.
     Args:
         s3_places_path (str): S3 path to places parquet files.
     """
-
+    start_time = time() 
     ## 1. First Get all the Distinct Categories from Places
     # Initialize DuckDB connection
     con = duckdb.connect()
@@ -84,7 +85,7 @@ def create_category_list(vector_db_dir: str):
 
     ## 2. Intialize the Embedding Model
     logging.info("Downloading Embeddings Model   ")
-    embeddings = HuggingFaceEmbeddings(model_name="Qwen/Qwen3-Embedding-0.6B")
+    embeddings = HuggingFaceEmbeddings(model_name=model_name)
     logging.info("Embeddings Model Downloaded   ")
 
     ## 3. Create the Vector DB
@@ -131,11 +132,14 @@ def create_category_list(vector_db_dir: str):
     )
     logging.info("Created Vector DB to Disk")
 
+    end_time = time()
+    logging.info(f"Time taken to create vector DB: {end_time - start_time} seconds")
 
-def load_vector_db(path, collection_name="poi_category_embeddings"):
+
+def load_vector_db(path, collection_name="poi_category_embeddings", model_name="sentence-transformers/all-MiniLM-L6-v2"):
     if os.path.exists(path):
         # Same embedding model as creation—critical for query consistency
-        embedding = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        embedding = HuggingFaceEmbeddings(model_name=model_name)
         
         vector_db = Chroma(
             persist_directory=path,
@@ -159,6 +163,21 @@ if __name__ == "__main__":
     #     s3_categories_path=s3_categories_path,
     #     output_path=r'data/output.geoparquet'
     # )
+    start_time = time()
 
     vector_db_path = r"data\vector_db"
-    create_category_list(vector_db_dir=vector_db_path)
+    # create_vector_db_for_categories(vector_db_dir=vector_db_path, model_name="Qwen/Qwen3-Embedding-0.6B")
+    vectordbs = glob(f"{vector_db_path}/chroma*")
+    if len(vectordbs) > 0:
+        logging.info(f"Found existing vector DBs: {vectordbs}")
+
+        vector_db = load_vector_db(path=vectordbs[0], model_name="Qwen/Qwen3-Embedding-0.6B")
+
+        logging.info(f"Vector DB has {vector_db._collection.count()} vectors.")
+        
+        query = "Find places where I can find Italian food in Gurgaon?"
+        results = vector_db.similarity_search(query, k=5)
+        for res in results: 
+            print(res.page_content)
+
+    print("Time taken: ", time() - start_time, " seconds")
