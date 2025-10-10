@@ -24,7 +24,6 @@ def get_duckdb_connection(database: str) -> duckdb.DuckDBPyConnection:
 
 def create_places_with_categories_view_and_export(
     s3_places_path: str,
-    s3_categories_path: str,
     output_path: str = r'data\output.geoparquet',
     db_path: str = ':memory:'
 ):
@@ -105,10 +104,8 @@ def create_vector_db_for_categories(vector_db_dir: str, model_name: str):
     ## 4. Create the Vector DB into Local Path
     ## Now Store the Embeddings in Vector Store
 
-    
-
     logging.info("Creating Vector DB Directory if not exists")
-    os.makedirs("db", exist_ok=True)
+    os.makedirs(vector_db_dir, exist_ok=True)
 
     random_suffix = randomname.get_name()
 
@@ -136,7 +133,7 @@ def create_vector_db_for_categories(vector_db_dir: str, model_name: str):
     logging.info(f"Time taken to create vector DB: {end_time - start_time} seconds")
 
 
-def load_vector_db(path, collection_name="poi_category_embeddings", model_name="sentence-transformers/all-MiniLM-L6-v2"):
+def load_vector_db(path, collection_name="poi_category_embeddings", model_name="Qwen/Qwen3-Embedding-0.6B"):
     if os.path.exists(path):
         # Same embedding model as creation—critical for query consistency
         embedding = HuggingFaceEmbeddings(model_name=model_name)
@@ -154,19 +151,19 @@ def load_vector_db(path, collection_name="poi_category_embeddings", model_name="
 
 
 if __name__ == "__main__":
-
+    start_time = time()
     # s3_places_path = 's3://fsq-os-places-us-east-1/release/dt=2025-09-09/places/parquet/places-*.zstd.parquet'
-    # s3_categories_path = 's3://fsq-os-places-us-east-1/release/dt=2025-09-09/categories/parquet/categories.zstd.parquet'
 
     # create_places_with_categories_view_and_export(
     #     s3_places_path=s3_places_path,
-    #     s3_categories_path=s3_categories_path,
     #     output_path=r'data/output.geoparquet'
     # )
-    start_time = time()
-
-    vector_db_path = r"data\vector_db"
+    
+    ## Create Vector DB for Categories
+    vector_db_path = r"data/vector_db"
     # create_vector_db_for_categories(vector_db_dir=vector_db_path, model_name="Qwen/Qwen3-Embedding-0.6B")
+
+    ## Retrieve from Vector DB
     vectordbs = glob(f"{vector_db_path}/chroma*")
     if len(vectordbs) > 0:
         logging.info(f"Found existing vector DBs: {vectordbs}")
@@ -175,8 +172,8 @@ if __name__ == "__main__":
 
         logging.info(f"Vector DB has {vector_db._collection.count()} vectors.")
         
-        query = "Find places where I can find Italian food in Gurgaon?"
-        results = vector_db.similarity_search(query, k=5)
+        query = "How many cafes are there in Delhi?"
+        results = vector_db.similarity_search(query, k=1)
         for res in results: 
             print(res.page_content)
 
