@@ -11,6 +11,10 @@ import shutil
 from src.utils.logger import logging
 import randomname
 from time import time
+from langchain_openai import OpenAIEmbeddings
+from dotenv import load_dotenv
+load_dotenv()
+
 
 def get_duckdb_connection(database: str) -> duckdb.DuckDBPyConnection:
     """Create and configure a DuckDB connection."""
@@ -84,7 +88,16 @@ def create_vector_db_for_categories(vector_db_dir: str, model_name: str):
 
     ## 2. Intialize the Embedding Model
     logging.info("Downloading Embeddings Model   ")
-    embeddings = HuggingFaceEmbeddings(model_name=model_name)
+    # embeddings = HuggingFaceEmbeddings(model_name=model_name)
+
+    embeddings = OpenAIEmbeddings(
+        model="text-embedding-3-large",
+        # With the `text-embedding-3` class
+        # of models, you can specify the size
+        # of the embeddings you want returned.
+        # dimensions=1024
+    )
+
     logging.info("Embeddings Model Downloaded   ")
 
     ## 3. Create the Vector DB
@@ -136,7 +149,16 @@ def create_vector_db_for_categories(vector_db_dir: str, model_name: str):
 def load_vector_db(path, collection_name="poi_category_embeddings", model_name="Qwen/Qwen3-Embedding-0.6B"):
     if os.path.exists(path):
         # Same embedding model as creation—critical for query consistency
-        embedding = HuggingFaceEmbeddings(model_name=model_name)
+        logging.info(f"Loading vector DB from {path} with collection {collection_name}")
+        # embedding = HuggingFaceEmbeddings(model_name=model_name)
+
+        embedding = OpenAIEmbeddings(
+            model="text-embedding-3-large",
+            # With the `text-embedding-3` class
+            # of models, you can specify the size
+            # of the embeddings you want returned.
+            # dimensions=1024
+        )
         
         vector_db = Chroma(
             persist_directory=path,
@@ -173,6 +195,7 @@ if __name__ == "__main__":
         logging.info(f"Vector DB has {vector_db._collection.count()} vectors.")
         
         query = "How many cafes are there in Delhi?"
+        logging.info(f"Querying Vector DB with: {query} for similar categories")
         results = vector_db.similarity_search(query, k=1)
         for res in results: 
             print(res.page_content)
