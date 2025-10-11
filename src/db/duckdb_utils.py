@@ -194,7 +194,7 @@ if __name__ == "__main__":
 
         logging.info(f"Vector DB has {vector_db._collection.count()} vectors.")
         
-        query = "How many cafes are there in Delhi?"
+        query = "List down some good where I can get nice sweets in Delhi?"
         logging.info(f"Querying Vector DB with: {query} for similar categories")
         results = vector_db.similarity_search(query, k=1)
         for res in results: 
