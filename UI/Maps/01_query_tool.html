@@ -246,6 +246,28 @@
                 .poi-desc { font-size:12px; color:#475569; margin-top:3px; line-height:1.2; }
                 /* messages scroll area */
                 #messages { flex: 1 1 auto; overflow-y: auto; padding: 8px; background:#fff; border:1px solid #eee; border-radius:6px; min-height:120px; }
+
+                /* Right panel cards */
+                .stats-cards { display:flex; flex-direction:column; gap:12px; margin-bottom:12px; }
+                .stat-card {
+                    background:#fff;
+                    border-radius:12px;
+                    padding:12px;
+                    box-shadow: 0 6px 18px rgba(10,20,40,0.04);
+                    border: 1px solid rgba(15,23,42,0.04);
+                    display:flex;
+                    flex-direction:column;
+                    gap:8px;
+                }
+                .stat-card .card-header { display:flex;justify-content:space-between;align-items:center }
+                .stat-card .card-title { font-weight:700;color:#0b5cff;font-size:14px }
+                .stat-card .card-sub { font-size:12px;color:#6b7280 }
+                .stat-card .legend { height:14px;border-radius:6px;overflow:hidden }
+                .stat-card .legend-svg { width:100%; height:18px; display:block }
+                .stat-card .summary { font-size:13px;color:#374151; display:flex; gap:10px; flex-direction:column }
+                .stat-card .summary-row { display:flex; justify-content:space-between; color:#475569; font-size:13px }
+                .collapse-toggle { background:transparent;border:none;color:#0b5cff;cursor:pointer;font-weight:600 }
+                .summary-pane { display:none; margin-top:8px; }
     </style>
 </head>
 <body>
@@ -271,10 +293,64 @@
         </div>
         <!-- Right Panel -->
         <div class="right-panel">
-            <div class="summary-title">Sales Summary</div>
-            <div class="summary-item">Total Sales: <span class="summary-value">₹1,23,45,678</span></div>
-            <div class="summary-item">Average Sales: <span class="summary-value">₹56,789</span></div>
-            <div class="summary-item">Number of Outlets: <span class="summary-value">1,234</span></div>
+            <div class="stats-cards">
+                <div class="stat-card" id="card-sales-state">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Sales by State</div>
+                            <div class="card-sub">Sales distribution across states</div>
+                        </div>
+                        <button class="collapse-toggle" data-target="sales-state-pane">Details ▾</button>
+                    </div>
+                    <div class="legend" id="legend-sales-state"></div>
+                    <div class="summary-pane" id="sales-state-pane">
+                        <div class="summary">
+                            <div class="summary-row"><div>Total</div><div id="sales-state-total">-</div></div>
+                            <div class="summary-row"><div>Average</div><div id="sales-state-avg">-</div></div>
+                            <div class="summary-row"><div>Min</div><div id="sales-state-min">-</div></div>
+                            <div class="summary-row"><div>Max</div><div id="sales-state-max">-</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card" id="card-coke-outlets">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Coke Outlets</div>
+                            <div class="card-sub">Outlet density and distribution</div>
+                        </div>
+                        <button class="collapse-toggle" data-target="coke-outlets-pane">Details ▾</button>
+                    </div>
+                    <div class="legend" id="legend-coke-outlets"></div>
+                    <div class="summary-pane" id="coke-outlets-pane">
+                        <div class="summary">
+                            <div class="summary-row"><div>Total</div><div id="coke-outlets-total">-</div></div>
+                            <div class="summary-row"><div>Average</div><div id="coke-outlets-avg">-</div></div>
+                            <div class="summary-row"><div>Min</div><div id="coke-outlets-min">-</div></div>
+                            <div class="summary-row"><div>Max</div><div id="coke-outlets-max">-</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card" id="card-red-outlets">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">RED outlets</div>
+                            <div class="card-sub">RED outlets distribution</div>
+                        </div>
+                        <button class="collapse-toggle" data-target="red-outlets-pane">Details ▾</button>
+                    </div>
+                    <div class="legend" id="legend-red-outlets"></div>
+                    <div class="summary-pane" id="red-outlets-pane">
+                        <div class="summary">
+                            <div class="summary-row"><div>Total</div><div id="red-outlets-total">-</div></div>
+                            <div class="summary-row"><div>Average</div><div id="red-outlets-avg">-</div></div>
+                            <div class="summary-row"><div>Min</div><div id="red-outlets-min">-</div></div>
+                            <div class="summary-row"><div>Max</div><div id="red-outlets-max">-</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <!-- Query Tool (bottom) -->
             <div class="query-tool" id="queryTool">
                 <div class="query-tabs">
@@ -420,6 +496,100 @@
                 side.appendChild(container);
             }
         })();
+    </script>
+    <script>
+    // Render small sequential legends and wire collapse toggles
+    (function renderLegendsAndWireToggles() {
+        // minimal D3-like gradient rendering without external libs
+        function renderLegend(containerId, maxVal=100) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            // create an inline canvas or svg gradient
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('class', 'legend-svg');
+            svg.setAttribute('width', '100%');
+            svg.setAttribute('height', '18');
+
+            const defs = document.createElementNS(svgNS, 'defs');
+            const linGrad = document.createElementNS(svgNS, 'linearGradient');
+            const gradId = 'grad-' + containerId;
+            linGrad.setAttribute('id', gradId);
+            linGrad.setAttribute('x1', '0%');
+            linGrad.setAttribute('x2', '100%');
+
+            // sample stops using interpolation of blues
+            const stops = [0, 0.25, 0.5, 0.75, 1];
+            stops.forEach((t, i) => {
+                const stop = document.createElementNS(svgNS, 'stop');
+                stop.setAttribute('offset', (t*100) + '%');
+                // simple interpolation between light and deep blue
+                const color = interpolateBlue(t);
+                stop.setAttribute('stop-color', color);
+                linGrad.appendChild(stop);
+            });
+
+            defs.appendChild(linGrad);
+            svg.appendChild(defs);
+
+            const rect = document.createElementNS(svgNS, 'rect');
+            rect.setAttribute('x', '0');
+            rect.setAttribute('y', '0');
+            rect.setAttribute('width', '100%');
+            rect.setAttribute('height', '14');
+            rect.setAttribute('fill', `url(#${gradId})`);
+            svg.appendChild(rect);
+
+            // add ticks (0 and max)
+            const text0 = document.createElementNS(svgNS, 'text');
+            text0.setAttribute('x', '0');
+            text0.setAttribute('y', '16');
+            text0.setAttribute('font-size', '10');
+            text0.setAttribute('fill', '#475569');
+            text0.textContent = '0';
+            svg.appendChild(text0);
+
+            const textMax = document.createElementNS(svgNS, 'text');
+            textMax.setAttribute('x', '96%');
+            textMax.setAttribute('y', '16');
+            textMax.setAttribute('font-size', '10');
+            textMax.setAttribute('fill', '#475569');
+            textMax.setAttribute('text-anchor', 'end');
+            textMax.textContent = String(maxVal);
+            svg.appendChild(textMax);
+
+            container.innerHTML = '';
+            container.appendChild(svg);
+        }
+
+        function interpolateBlue(t) {
+            // simple interpolation from #eef2ff to #0b5cff
+            const start = [238, 242, 255];
+            const end = [11, 92, 255];
+            const r = Math.round(start[0] + (end[0]-start[0])*t);
+            const g = Math.round(start[1] + (end[1]-start[1])*t);
+            const b = Math.round(start[2] + (end[2]-start[2])*t);
+            return `rgb(${r},${g},${b})`;
+        }
+
+        ['legend-sales-state','legend-coke-outlets','legend-red-outlets'].forEach(id => renderLegend(id, 100));
+
+        // collapse toggles
+        document.querySelectorAll('.collapse-toggle').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const targetId = this.dataset.target;
+                const pane = document.getElementById(targetId);
+                if (!pane) return;
+                if (pane.style.display === 'none' || pane.style.display === '') {
+                    pane.style.display = 'block';
+                    this.textContent = 'Details ▴';
+                } else {
+                    pane.style.display = 'none';
+                    this.textContent = 'Details ▾';
+                }
+            });
+        });
+    })();
     </script>
     <script>
         // Query Tool JS: chat UI behavior - display messages and POST to /ask
