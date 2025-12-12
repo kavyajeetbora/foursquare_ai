@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Overture Places – Simple Dots Only</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.0/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
+    <script src="https://unpkg.com/protomaps-leaflet@4.1.0/dist/protomaps-leaflet.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/protomaps-leaflet@latest/dist/protomaps-leaflet.js"></script>
+
+    <style>
+        body,
+        html,
+        #map {
+            margin: 0;
+            height: 100%
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div id="info-box">
+        <h3>Map Info</h3>
+        <div>
+            <p id="zoom-level"></p>
+            <p id="bounds"></p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { PMTiles } from "https://cdn.jsdelivr.net/npm/pmtiles/+esm";
+        import Pbf from "https://cdn.jsdelivr.net/npm/pbf/+esm";
+        import { VectorTile } from "https://cdn.jsdelivr.net/npm/@mapbox/vector-tile/+esm";
+        import * as turf from "https://cdn.jsdelivr.net/npm/@turf/turf/+esm";
+
+        // const pmtile_url = 'https://overturemaps-tiles-us-west-2-beta.s3.amazonaws.com/2025-04-23/places.pmtiles';
+        const pmtile_url = 'http://localhost:8000/india-latest-en.pmtiles';
+        const archive = new PMTiles(pmtile_url);
+
+        // Simple dot symbolizer — draws a small red dot for every place
+        // class MyPlaceSymbolizer {
+        //     draw(context, geom, z, feature) {
+        //         // console.log(properties)
+        //         let pt = geom[0][0]
+        //         var fill = "palegreen"
+        //         if (feature.props.place == "suburb") fill = "lightgreen"
+        //         if (feature.props.place == "city") fill = "mediumseagreen"
+        //         context.fillStyle = fill
+        //         context.strokeStyle = "black"
+        //         context.beginPath()
+        //         context.arc(pt.x, pt.y, 4, 0, 2 * Math.PI)
+        //         context.stroke()
+        //         context.fill()
+        //     }
+        // }
+        class MyPlaceSymbolizer {
+            place(layout, geom, feature) {
+                let pt = geom[0][0]
+                let name = feature.props["name:en"] || feature.props.name || "unknown"
+                if (!name || !/^[A-Za-z0-9\s\.,'!?-]+$/.test(name)) return [];
+
+                var font = "12px sans-serif"
+
+                layout.scratch.font = font
+                let metrics = layout.scratch.measureText(name)
+                let width = metrics.width
+                let ascent = metrics.actualBoundingBoxAscent
+                let descent = metrics.actualBoundingBoxDescent
+                let bbox = { minX: pt.x - width / 2, minY: pt.y - ascent, maxX: pt.x + width / 2, maxY: pt.y + descent }
+
+                let draw = ctx => {
+                    ctx.font = font
+                    ctx.fillStyle = "darkslategray"
+                    ctx.fillText(name, -width / 2, 0)
+                }
+                return [{ anchor: pt, bboxes: [bbox], draw: draw }]
+            }
+        }
+
+        class QGISLabelSymbolizer {
+            place(layout, geom, feature) {
+                const p = feature.props;
+                const z = layout.zoom;
+                const pt = geom[0][0];
+
+                // English name only
+                const name = p["name:en"] || p.name || "";
+                if (!name || !/^[A-Za-z0-9\s\.,'!?-]+$/.test(name)) return [];
+
+                // Convert mm to pixels (96 DPI)
+                const MM_TO_PX = 96 / 25.4;
+
+                // === REDUCED FONT SIZES (as requested) ===
+                let sizeMM = 2.8; // reduced from 3.175
+
+                if (p.class === "continent") {
+                    sizeMM = 3.3; // was 3.7042
+                }
+                else if (p.class === "country" && p.rank <= 2) {
+                    sizeMM = this.scale(z, 2, 6, 2.6, 3.3); // reduced
+                }
+                else if (p.class === "country") {
+                    sizeMM = this.scale(z, 3, 9, 2.5, 3.1); // reduced
+                }
+                else if (p.class === "state") {
+                    sizeMM = this.scale(z, 5, 9, 2.4, 3.3); // significantly smaller
+                }
+                else if ((p.class === "city" && p.rank <= 5) || p.capital) {
+                    sizeMM = this.scale(z, 8, 14, 2.6, 4.0); // smaller than before
+                }
+                else if (p.class === "city") {
+                    sizeMM = this.scale(z, 8, 14, 2.4, 3.7); // smaller
+                }
+                else if (p.class === "town") {
+                    sizeMM = this.scale(z, 8, 13, 2.3, 3.4); // slightly reduced
+                }
+                else if (p.class === "village") {
+                    sizeMM = this.scale(z, 10, 15, 2.1, 3.0);
+                }
+                else if (["suburb", "neighbourhood", "hamlet"].includes(p.class)) {
+                    sizeMM = this.scale(z, 12, 15, 1.9, 2.8);
+                }
+
+                const sizePx = sizeMM * MM_TO_PX;
+
+                // === NO BOLD + SOFTER GRAY TEXT ===
+                const uppercase = ["continent", "country", "state", "city", "town"].includes(p.class);
+                const halo = p.class !== "state"; // keep halo as in QGIS
+
+                const font = `400 ${sizePx}px "Montserrat", Arial, sans-serif`; // NO BOLD
+                const text = uppercase ? name.toUpperCase() : name;
+
+                // Measure text for bbox (kept for collision detection)
+                layout.scratch.font = font;
+                const metrics = layout.scratch.measureText(text);
+                const width = metrics.width;
+                const height = sizePx * 1.2;
+
+                const bbox = {
+                    minX: pt.x - width / 2,
+                    minY: pt.y - height / 2,
+                    maxX: pt.x + width / 2,
+                    maxY: pt.y + height / 2
+                };
+
+                const draw = (ctx) => {
+                    ctx.font = font;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+
+                    if (halo) {
+                        ctx.strokeStyle = "#ffffff";
+                        ctx.lineWidth = 4.2;
+                        ctx.strokeText(text, 0, 0);
+                    }
+
+                    // Softer, lighter gray — between dark gray and medium gray
+                    ctx.fillStyle = "#888888"; // was #7d7d7d → now softer #888888
+                    ctx.fillText(text, 0, 0);
+                };
+
+                return [{ anchor: pt, bboxes: [bbox], draw }];
+            }
+
+            // QGIS scale_linear()
+            scale(z, z1, z2, v1, v2) {
+                if (z <= z1) return v1;
+                if (z >= z2) return v2;
+                return v1 + (v2 - v1) * (z - z1) / (z2 - z1);
+            }
+        }
+
+        
+        let LABEL_RULES = [
+            {
+                dataLayer: "place",
+                symbolizer: new QGISLabelSymbolizer()
+            }
+        ]
+
+        // Only one rule: draw dots from layer "place"
+        const PAINT_RULES = [
+            {
+                dataLayer: "place",
+                symbolizer: new MyPlaceSymbolizer()
+            }
+        ];
+
+        const map = L.map('map').setView([20, 78], 5);  // India center
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        protomapsL.leafletLayer({
+            url: pmtile_url,
+            paintRules: [],
+            labelRules: LABEL_RULES
+        }).addTo(map);
+
+    </script>
+</body>
+
+</html>
