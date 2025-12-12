@@ -29,11 +29,11 @@
             maxZoom: 20
         }).addTo(map);
 
-        var indiaBasemap = L.tileLayer('https://raw.githubusercontent.com/kavyajeetbora/foursquare_ai/b81cc75091606a1a6385fcbdd1564974e67975c8/india-basemap/{z}/{x}/{y}.png', {
+        var indiaBasemap = L.tileLayer('file:///C:/Users/KavyajeetBora/Downloads/foursquare_ai/sample-tile/{z}/{x}/{y}.png', {
             attribution: 'India Basemap by Kavyajeet Bora',
             minZoom: 4,
             maxZoom: 18,           // Allow zoom up to 18
-            maxNativeZoom: 12,     // This is the key! Tells Leaflet real tiles stop at 12
+            maxNativeZoom: 10,     // This is the key! Tells Leaflet real tiles stop at 12
             noWrap: true,          // Prevents weird wrapping at edges
             // bounds: [[6, 66], [38, 99]]  // Optional: restrict to India extents
         }).addTo(map);
