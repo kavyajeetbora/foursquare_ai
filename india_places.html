@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Overture Places – Simple Dots Only</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.0/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
+    <script src="https://unpkg.com/protomaps-leaflet@4.1.0/dist/protomaps-leaflet.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/protomaps-leaflet@latest/dist/protomaps-leaflet.js"></script>
+
+    <style>
+        body,
+        html,
+        #map {
+            margin: 0;
+            height: 100%;
+        }
+
+        /* Zoom level HUD in top right */
+        #zoomHud {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.75);
+            border-radius: 4px;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 12px;
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div id="zoomHud">Zoom: –</div>
+
+    <script type="module">
+        import { PMTiles } from "https://cdn.jsdelivr.net/npm/pmtiles/+esm";
+        import Pbf from "https://cdn.jsdelivr.net/npm/pbf/+esm";
+        import { VectorTile } from "https://cdn.jsdelivr.net/npm/@mapbox/vector-tile/+esm";
+        import * as turf from "https://cdn.jsdelivr.net/npm/@turf/turf/+esm";
+
+        const pmtile_url = 'http://localhost:8000/india-latest-en.pmtiles';
+        const archive = new PMTiles(pmtile_url);
+
+        class MyPlaceSymbolizer {
+            place(layout, geom, feature) {
+                let pt = geom[0][0];
+                let name = feature.props["name:en"] || feature.props.name || "unknown";
+                if (!name || !/^[A-Za-z0-9\s\.,'!?-]+$/.test(name)) return [];
+
+                const font = "12px sans-serif";
+
+                layout.scratch.font = font;
+                const metrics = layout.scratch.measureText(name);
+                const width = metrics.width;
+                const ascent = metrics.actualBoundingBoxAscent;
+                const descent = metrics.actualBoundingBoxDescent;
+                const bbox = {
+                    minX: pt.x - width / 2,
+                    minY: pt.y - ascent,
+                    maxX: pt.x + width / 2,
+                    maxY: pt.y + descent
+                };
+
+                const draw = ctx => {
+                    ctx.font = font;
+                    ctx.fillStyle = "rgba(47, 79, 79, 0.7)"; // darkslategray @ 70%
+                    ctx.fillText(name, -width / 2, 0);
+                };
+                return [{ anchor: pt, bboxes: [bbox], draw }];
+            }
+        }
+
+        class QGISLabelSymbolizer {
+            place(layout, geom, feature) {
+                const p = feature.props;
+                const z = layout.zoom;
+                const pt = geom[0][0];
+
+                const name = p["name:en"] || p.name || "";
+                if (!name || !/^[A-Za-z0-9\s\.,'!?-]+$/.test(name)) return [];
+
+                const MM_TO_PX = 96 / 25.4;
+                let sizeMM = 2.8;
+
+                if (p.class === "continent") {
+                    sizeMM = 3.3;
+                } else if (p.class === "country" && p.rank <= 2) {
+                    sizeMM = this.scale(z, 2, 6, 2.6, 3.3);
+                } else if (p.class === "country") {
+                    sizeMM = this.scale(z, 3, 9, 2.5, 3.1);
+                } else if (p.class === "state") {
+                    sizeMM = this.scale(z, 5, 9, 2.4, 3.3);
+                } else if ((p.class === "city" && p.rank <= 5) || p.capital) {
+                    sizeMM = this.scale(z, 8, 14, 2.6, 4.0);
+                } else if (p.class === "city") {
+                    sizeMM = this.scale(z, 8, 14, 2.4, 3.7);
+                } else if (p.class === "town") {
+                    sizeMM = this.scale(z, 8, 13, 2.3, 3.4);
+                } else if (p.class === "village") {
+                    sizeMM = this.scale(z, 10, 15, 2.1, 3.0);
+                } else if (["suburb", "neighbourhood", "hamlet"].includes(p.class)) {
+                    sizeMM = this.scale(z, 12, 15, 1.9, 2.8);
+                }
+
+                const sizePx = sizeMM * MM_TO_PX;
+
+                // Only COUNTRY and STATE are uppercase and boldish.
+                const isCountryOrState = p.class === "country" || p.class === "state";
+
+                const text = isCountryOrState ? name.toUpperCase() : name; // no caps for others
+                const fontWeight = isCountryOrState ? 600 : 400;           // only country/state boldish
+                const font = `${fontWeight} ${sizePx}px "Montserrat", Arial, sans-serif`;
+
+                layout.scratch.font = font;
+                const metrics = layout.scratch.measureText(text);
+                const width = metrics.width;
+                const height = sizePx * 1.2;
+
+                const bbox = {
+                    minX: pt.x - width / 2,
+                    minY: pt.y - height / 2,
+                    maxX: pt.x + width / 2,
+                    maxY: pt.y + height / 2
+                };
+
+                const draw = (ctx) => {
+                    ctx.font = font;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+
+                    // Transparent background: no halo
+                    ctx.fillStyle = "rgba(136, 136, 136, 0.65)"; // translucent gray
+                    ctx.fillText(text, 0, 0);
+                };
+
+                return [{ anchor: pt, bboxes: [bbox], draw }];
+            }
+
+            scale(z, z1, z2, v1, v2) {
+                if (z <= z1) return v1;
+                if (z >= z2) return v2;
+                return v1 + (v2 - v1) * (z - z1) / (z2 - z1);
+            }
+        }
+
+        const LABEL_RULES = [
+            {
+                dataLayer: "place",
+                symbolizer: new QGISLabelSymbolizer()
+            }
+        ];
+
+        const PAINT_RULES = [
+            {
+                dataLayer: "place",
+                symbolizer: new MyPlaceSymbolizer()
+            }
+        ];
+
+        const map = L.map('map').setView([20, 78], 5);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        protomapsL.leafletLayer({
+            url: pmtile_url,
+            paintRules: [],
+            labelRules: LABEL_RULES
+        }).addTo(map);
+
+        // Zoom HUD update
+        const zoomHud = document.getElementById('zoomHud');
+        function updateZoomHud() {
+            zoomHud.textContent = `Zoom: ${map.getZoom().toFixed(2)}`;
+        }
+        map.on('zoomend', updateZoomHud);
+        map.on('load', updateZoomHud);
+        updateZoomHud();
+    </script>
+</body>
+
+</html>
