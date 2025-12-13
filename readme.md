@@ -2,12 +2,16 @@
 
 ## Introduction
 
-This repository enables the creation of a tailored basemap for a designated country—exemplified here by India—derived from OpenStreetMap (OSM) data. By concentrating exclusively on `place` layers, such as cities, towns, villages, and administrative boundaries, it delivers precise place names strictly aligned with the country's recognized territories. Deliberately omitting features from disputed or contested areas (e.g., border regions) ensures geopolitical neutrality and data integrity, making it a dependable solution for enterprise applications in sectors like logistics, real-time navigation, real estate, and geospatial intelligence—where accuracy and compliance are paramount for industrial-scale operations.
+This repository enables the creation of a tailored basemap for a designated country—exemplified here by India—derived from OpenStreetMap (OSM) data. 
+
+- **Custom Basemap Creation**: Tailors basemaps for specific countries (e.g., India) using OpenStreetMap (OSM) data.
+- **Focused Layers**: Targets only `place` elements like cities, towns, villages, and administrative boundaries for precise, territory-aligned place names.
+- **Neutrality Filter**: Excludes disputed areas (e.g., border regions) to maintain geopolitical neutrality and data integrity.
+- **Enterprise Suitability**: Ideal for industrial applications in logistics, real-time navigation, real estate, and geospatial intelligence, prioritizing accuracy and compliance.
 
 The foundational dataset is the official OSM extract: [india-latest.osm.pbf](https://download.geofabrik.de/asia/india-latest.osm.pbf). Processing yields optimized PMTiles files for the `place` layers, facilitating efficient, high-performance map rendering without extraneous global clutter.
 
-Source: [india-latest.osm.pbf](https://download.geofabrik.de/asia/india-latest.osm.pbf). Output: Lightweight PMTiles for efficient serving.
-
+Here is a demo of the pmtile generated: 
 <img src="docs/Custom Indian Places Basemap.gif"/>
 
 
